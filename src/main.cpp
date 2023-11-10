@@ -3,7 +3,7 @@
 #include <SoftwareSerial.h>
 
 SoftwareSerial modbusSerial(8,9);
-
+bool flag = true;
 // Variaveis uteis para o recebimento de mensagem
 unsigned long tempo = 0; // "Timer" para saber se a msg acabou
 String buf = ""; // String que recebe a mensagem
@@ -13,9 +13,7 @@ bool recebeu = false; // Booleana para saber se a msg foi iniciada
 #define RE_DE 2
 
 // Valor inteiro a ser salvo no registrador 
-uint8_t valor = 0xAA55;
-
-unsigned int CRC16(uint8_t msg[], uint8_t len);
+//uint8_t valor = 0xAA55;
 
 void setup()
 {
@@ -51,27 +49,118 @@ void loop()
       Serial.print(" ");
       Serial.print(uint8_t(buf[i]), HEX);
       
-      if(i == 7)
+      if(i == buf.length()-1)
       { 
-        // Pula a linha quando i = 10
-        Serial.println();
+        // Pula a linha 
+        Serial.println();      
       }
     }
 
 
     // Analisa a solicitação Modbus recebida
-    if (buf.length() == 8 && buf[1] == 0x03) {
-      // Verifica se a mensagem é uma solicitação de leitura de registrador
-      uint16_t registrador = (uint16_t(buf[2]) << 8) + uint16_t(buf[3]);
 
-      if (registrador == 0x006B) {
+//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+///*
+    if (buf.length() == 17 && buf[1] == 0x10) {
+      // Verifica se a mensagem é uma solicitação de leitura de registrador
+      uint8_t registrador = uint8_t(buf[3]);
+      //Serial.println(registrador, HEX);
+      
+      if (registrador == 0xC8) {
         // A mensagem é válida; prepare a resposta
-        uint8_t resposta[5] = {0x01, 0x03, 0x02, 0x00, 0x00}; // Endereço SLAVE, código da função e tamanho do campo de dados
+        uint8_t resposta[06] = {0xF0, 0x10, 0x00, 0xC8, 0x00, 0x04}; // Endereço SLAVE, código da função e tamanho do campo de dados
         
-        resposta[4] = 0xAA; // Dado a ser enviado como resposta
-        
+        //resposta[4] = 0x06; // Dado a ser enviado como resposta
+        //resposta[6] = 0x06;
+        //resposta[8] = 0x06;
+        //resposta[10] = 0x06;
+
         // Calcula o CRC com base na mensagem de resposta
-        unsigned int crc = CRC16(resposta, 5);
+        unsigned int crc = CRC16(resposta, 06);
+
+        digitalWrite(RE_DE, HIGH); // Coloca os pinos em HIGH para enviar os dados
+        
+        // Imprima os dados da resposta
+        for (int i = 0; i < 6; i++) {
+          Serial.print(resposta[i], HEX);
+          Serial.print(" ");
+        }
+        Serial.print(crc, HEX);
+        Serial.println();
+
+        // Envie a resposta
+        for (int i = 0; i < 6; i++) {
+          modbusSerial.write(resposta[i]);
+        }
+
+        // Envie o CRC
+        modbusSerial.write(crc & 0xFF); // Byte menos significativo do CRC
+        modbusSerial.write((crc >> 8) & 0xFF); // Byte mais significativo do CRC
+        modbusSerial.flush(); // Aguarde os dados serem enviados
+
+        digitalWrite(RE_DE, LOW); // Coloca os pinos RE_DE em LOW novamente para receber os dados
+      }
+    }
+//*/
+//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+    if (buf.length() == 19 && buf[1] == 0x10) {
+      // Verifica se a mensagem é uma solicitação de leitura de registrador
+      uint8_t registrador = uint8_t(buf[3]);
+
+      if (registrador == 0x66) {
+        // A mensagem é válida; prepare a resposta
+        uint8_t resposta[06] = {0xF0, 0x10, 0x00, 0x66, 0x00, 0x05}; // Endereço SLAVE, código da função e tamanho do campo de dados
+        
+        //resposta[4] = 0x06; // Dado a ser enviado como resposta
+        //resposta[6] = 0x06;
+        //resposta[8] = 0x06;
+        //resposta[10] = 0x06;
+
+        // Calcula o CRC com base na mensagem de resposta
+        unsigned int crc = CRC16(resposta, 06);
+
+        digitalWrite(RE_DE, HIGH); // Coloca os pinos em HIGH para enviar os dados
+        
+        // Imprima os dados da resposta
+        for (int i = 0; i < 6; i++) {
+          Serial.print(resposta[i], HEX);
+          Serial.print(" ");
+        }
+        Serial.print(crc, HEX);
+        Serial.println();
+
+        // Envie a resposta
+        for (int i = 0; i < 6; i++) {
+          modbusSerial.write(resposta[i]);
+        }
+
+        // Envie o CRC
+        modbusSerial.write(crc & 0xFF); // Byte menos significativo do CRC
+        modbusSerial.write((crc >> 8) & 0xFF); // Byte mais significativo do CRC
+        modbusSerial.flush(); // Aguarde os dados serem enviados
+
+        digitalWrite(RE_DE, LOW); // Coloca os pinos RE_DE em LOW novamente para receber os dados
+      }
+    }
+
+//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+    if (buf.length() == 8 && buf[1] == 0x03 && flag == true) {
+      // Verifica se a mensagem é uma solicitação de leitura de registrador
+      uint8_t registrador = uint8_t(buf[3]);
+
+      if (registrador == 0x6C) {
+        // A mensagem é válida; prepare a resposta
+        uint8_t resposta[05] = {0xF0, 0x03, 0x02, 0x00, 0x0A}; // Endereço SLAVE, código da função e tamanho do campo de dados
+        
+        //resposta[4] = 0x06; // Dado a ser enviado como resposta
+        //resposta[6] = 0x06;
+        //resposta[8] = 0x06;
+        //resposta[10] = 0x06;
+
+        // Calcula o CRC com base na mensagem de resposta
+        unsigned int crc = CRC16(resposta, 05);
 
         digitalWrite(RE_DE, HIGH); // Coloca os pinos em HIGH para enviar os dados
         
@@ -94,10 +183,11 @@ void loop()
         modbusSerial.flush(); // Aguarde os dados serem enviados
 
         digitalWrite(RE_DE, LOW); // Coloca os pinos RE_DE em LOW novamente para receber os dados
+        flag = false; 
       }
-
-
     }
+
+//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++    
     // Reseta os parâmetros
     buf = "";
     recebeu = false;
